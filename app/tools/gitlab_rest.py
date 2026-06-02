@@ -3,8 +3,10 @@
 These fill gaps in the GitLab MCP server which lacks file read, tree list,
 branch create, and commit tools.
 
-SECURITY: GitLab PATs are stored in a module-level dict keyed by session user_id,
-never in ADK session state (which could be serialized to Firestore).
+SECURITY: GitLab PATs are provided per-request by the user and stored in a
+module-level dict keyed by session user_id for the duration of the pipeline
+run only. Tokens are never stored in ADK session state (which could be
+serialized to Firestore), never in environment variables, and never logged.
 """
 import logging
 import os
@@ -34,10 +36,12 @@ def clear_token(user_id: str) -> None:
 def _get_client(tool_context: ToolContext) -> tuple[gitlab.Gitlab, str]:
     """Create a GitLab client and extract project path from state."""
     user_id = getattr(tool_context, "user_id", None) or ""
-    # Look up token from in-memory store (not session state)
-    token = _token_store.get(user_id) or os.getenv("GITLAB_PERSONAL_ACCESS_TOKEN")
+    token = _token_store.get(user_id)
     if not token:
-        raise ValueError("No GitLab token available for this session")
+        raise ValueError(
+            "No GitLab token available for this session. "
+            "Token must be provided per-request via the API."
+        )
 
     gitlab_url = os.getenv("GITLAB_URL", "https://gitlab.com")
     gl = gitlab.Gitlab(gitlab_url, private_token=token)
