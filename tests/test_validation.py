@@ -1,4 +1,5 @@
 """Tests for generated config validation."""
+
 from backend.validation import (
     scan_for_secrets,
     validate_docker_compose,

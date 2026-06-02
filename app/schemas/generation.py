@@ -1,4 +1,5 @@
 """Schema for Generator Agent output."""
+
 from dataclasses import dataclass, field
 
 

@@ -1,4 +1,5 @@
-"""Async ADK pipeline execution with retry logic."""
+"""Async ADK pipeline execution."""
+
 import asyncio
 import logging
 
@@ -20,7 +21,6 @@ from backend.job_store import update_job
 
 logger = logging.getLogger(__name__)
 
-# Limit concurrent pipeline runs to prevent Gemini rate limit exhaustion
 _semaphore = asyncio.Semaphore(2)
 
 
@@ -30,13 +30,11 @@ async def run_pipeline(
     gitlab_token: str,
     target_branch: str = "main",
 ) -> None:
-    """Run the full Scanner → Detector → Generator pipeline."""
+    """Run the full Scanner -> Detector -> Generator pipeline."""
     user_id = f"job-{job_id}"
     async with _semaphore:
         try:
             update_job(job_id, status="scanning")
-
-            # Store PAT in memory only — never in ADK session state
             set_token(user_id, gitlab_token)
 
             session_service = InMemorySessionService()
@@ -56,7 +54,6 @@ async def run_pipeline(
                 session_service=session_service,
             )
 
-            # Run the pipeline by sending a trigger message
             trigger = f"Analyze the GitLab project at {project_url} and generate local dev environment configuration. Target branch: {target_branch}"
 
             async for event in runner.run_async(
@@ -67,9 +64,12 @@ async def run_pipeline(
                     parts=[types.Part(text=trigger)],
                 ),
             ):
-                # Track status changes from agent state updates
                 if hasattr(event, "actions") and event.actions:
-                    state = event.actions.state_delta if hasattr(event.actions, "state_delta") else {}
+                    state = (
+                        event.actions.state_delta
+                        if hasattr(event.actions, "state_delta")
+                        else {}
+                    )
                     if PIPELINE_STATUS_KEY in state:
                         status = state[PIPELINE_STATUS_KEY]
                         if status == "scanning_complete":
@@ -77,7 +77,6 @@ async def run_pipeline(
                         elif status == "detecting_complete":
                             update_job(job_id, status="generating")
 
-            # Retrieve final results from session state
             final_session = await session_service.get_session(
                 app_name="do_it_local",
                 user_id=session.user_id,
@@ -99,5 +98,4 @@ async def run_pipeline(
             logger.exception("Pipeline failed for job %s", job_id)
             update_job(job_id, status="error", error=str(e))
         finally:
-            # Always clean up the PAT from memory
             clear_token(user_id)

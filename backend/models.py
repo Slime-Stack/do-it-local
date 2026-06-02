@@ -1,4 +1,5 @@
 """Request/response Pydantic models."""
+
 from enum import StrEnum
 
 from pydantic import BaseModel, Field, HttpUrl, SecretStr

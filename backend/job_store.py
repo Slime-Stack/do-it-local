@@ -1,7 +1,5 @@
-"""Job state management backed by Firestore.
+"""Job state management. Firestore in production, in-memory for local dev."""
 
-Falls back to in-memory dict for local development without Firestore.
-"""
 import logging
 import os
 import uuid
@@ -9,13 +7,11 @@ from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
-# In-memory fallback for local dev
 _local_store: dict[str, dict] = {}
 _firestore_client = None
 
 
 def _get_firestore():
-    """Lazy-init Firestore client. Returns None if unavailable."""
     global _firestore_client
     if _firestore_client is not None:
         return _firestore_client
@@ -26,16 +22,15 @@ def _get_firestore():
 
             db_name = os.getenv("FIRESTORE_DATABASE", "(default)")
             _firestore_client = firestore.Client(database=db_name)
-            logger.info("Firestore client initialized (database=%s)", db_name)
+            logger.info("Firestore initialized (database=%s)", db_name)
             return _firestore_client
         except Exception as e:
-            logger.warning("Firestore unavailable, using in-memory store: %s", e)
+            logger.warning("Firestore unavailable, using in-memory: %s", e)
             return None
     return None
 
 
 def _collection():
-    """Get the jobs collection reference."""
     client = _get_firestore()
     if client:
         return client.collection("jobs")
@@ -43,7 +38,6 @@ def _collection():
 
 
 def create_job(project_url: str, target_branch: str) -> str:
-    """Create a new job, return job_id."""
     job_id = str(uuid.uuid4())
     job_data = {
         "job_id": job_id,
@@ -68,7 +62,6 @@ def create_job(project_url: str, target_branch: str) -> str:
 
 
 def get_job(job_id: str) -> dict | None:
-    """Get job data by ID."""
     col = _collection()
     if col:
         doc = col.document(job_id).get()
@@ -77,9 +70,7 @@ def get_job(job_id: str) -> dict | None:
 
 
 def update_job(job_id: str, **kwargs) -> None:
-    """Update job fields."""
     kwargs["updated_at"] = datetime.now(UTC).isoformat()
-
     col = _collection()
     if col:
         col.document(job_id).update(kwargs)

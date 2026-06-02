@@ -1,4 +1,5 @@
 """ADK agent callbacks for structured logging."""
+
 import json
 import logging
 import time

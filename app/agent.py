@@ -1,9 +1,8 @@
-"""
-Do It Local — ADK Agent Definitions.
+"""Do It Local — ADK Agent Definitions.
 
-Sequential pipeline: Scanner → Detector → Generator
-Analyzes GitLab repos, detects PII/sensitive data, generates local dev configs.
+Sequential pipeline: Scanner -> Detector -> Generator
 """
+
 import os
 
 from google.adk import Agent
@@ -16,18 +15,15 @@ from .prompts import DETECTOR_INSTRUCTION, GENERATOR_INSTRUCTION, SCANNER_INSTRU
 from .tools import (
     commit_files,
     create_branch,
-    # GitLab REST tools
     list_repo_tree,
     read_detection_result,
     read_file,
     read_scan_result,
     save_detection_result,
     save_generation_result,
-    # State tools
     save_scan_result,
 )
 
-# Configure auth mode for Vertex AI vs API key
 if os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() == "true":
     import google.auth
 
@@ -35,10 +31,6 @@ if os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() == "true":
     os.environ.setdefault("GOOGLE_CLOUD_PROJECT", project_id or "")
     os.environ.setdefault("GOOGLE_CLOUD_LOCATION", "global")
 
-
-# =============================================================================
-# SCANNER AGENT — reads repo, builds dependency graph
-# =============================================================================
 
 scanner_agent = Agent(
     name="scanner",
@@ -51,17 +43,8 @@ scanner_agent = Agent(
     ),
     before_model_callback=before_model_callback,
     after_model_callback=after_model_callback,
-    tools=[
-        list_repo_tree,
-        read_file,
-        save_scan_result,
-        # MCP tools (semantic_code_search, search) added at runtime if available
-    ],
+    tools=[list_repo_tree, read_file, save_scan_result],
 )
-
-# =============================================================================
-# DETECTOR AGENT — analyzes scan for PII, side-effects, compliance
-# =============================================================================
 
 detector_agent = Agent(
     name="detector",
@@ -74,15 +57,8 @@ detector_agent = Agent(
     ),
     before_model_callback=before_model_callback,
     after_model_callback=after_model_callback,
-    tools=[
-        read_scan_result,
-        save_detection_result,
-    ],
+    tools=[read_scan_result, save_detection_result],
 )
-
-# =============================================================================
-# GENERATOR AGENT — produces configs, commits, creates MR
-# =============================================================================
 
 generator_agent = Agent(
     name="generator",
@@ -101,13 +77,8 @@ generator_agent = Agent(
         create_branch,
         commit_files,
         save_generation_result,
-        # MCP create_merge_request added at runtime if available
     ],
 )
-
-# =============================================================================
-# PIPELINE — Sequential: Scanner → Detector → Generator
-# =============================================================================
 
 root_agent = SequentialAgent(
     name="do_it_local_pipeline",

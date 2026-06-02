@@ -1,4 +1,5 @@
 """Schema for Detector Agent output."""
+
 from dataclasses import dataclass, field
 
 

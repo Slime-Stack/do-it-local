@@ -1,10 +1,7 @@
 """Validation for generated configuration files."""
-import logging
+
 import re
 
-logger = logging.getLogger(__name__)
-
-# Patterns that suggest leaked secrets
 SECRET_PATTERNS = [
     r"sk_live_[a-zA-Z0-9]{20,}",
     r"sk-[a-zA-Z0-9]{20,}",
@@ -16,7 +13,6 @@ SECRET_PATTERNS = [
 
 
 def validate_yaml(content: str) -> list[str]:
-    """Validate YAML syntax. Returns list of errors."""
     errors = []
     try:
         from ruamel.yaml import YAML
@@ -31,7 +27,6 @@ def validate_yaml(content: str) -> list[str]:
 
 
 def validate_docker_compose(content: str) -> list[str]:
-    """Validate docker-compose structure."""
     errors = validate_yaml(content)
     if errors:
         return errors
@@ -50,7 +45,6 @@ def validate_docker_compose(content: str) -> list[str]:
 
 
 def validate_env_file(content: str) -> list[str]:
-    """Validate .env file format."""
     errors = []
     for i, line in enumerate(content.splitlines(), 1):
         line = line.strip()
@@ -62,10 +56,11 @@ def validate_env_file(content: str) -> list[str]:
 
 
 def scan_for_secrets(content: str) -> list[str]:
-    """Scan content for potential leaked secrets."""
     findings = []
     for pattern in SECRET_PATTERNS:
         matches = re.findall(pattern, content)
         if matches:
-            findings.append(f"Potential secret pattern found: {pattern} ({len(matches)} matches)")
+            findings.append(
+                f"Potential secret pattern found: {pattern} ({len(matches)} matches)"
+            )
     return findings
