@@ -1,0 +1,49 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/api:${SHORT_SHA}'
+      - '-f'
+      - 'deployment/Dockerfile'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/api:${SHORT_SHA}'
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'do-it-local'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/api:${SHORT_SHA}'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-secrets'
+      - 'GOOGLE_API_KEY=GEMINI_API_KEY:latest,GITLAB_PERSONAL_ACCESS_TOKEN=GITLAB_DEFAULT_TOKEN:latest,API_KEY=API_KEY:latest'
+      - '--cpu'
+      - '2'
+      - '--memory'
+      - '4Gi'
+      - '--timeout'
+      - '600'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '3'
+      - '--service-account'
+      - 'do-it-local-runner@${PROJECT_ID}.iam.gserviceaccount.com'
+
+substitutions:
+  _REGION: us-central1
+  _REPO_NAME: do-it-local
+
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/api:${SHORT_SHA}'

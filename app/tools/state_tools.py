@@ -1,0 +1,83 @@
+"""State management tools for passing data between agents via ADK session state."""
+import json
+
+from google.adk.tools import ToolContext
+
+from app.constants.state_keys import (
+    DETECTION_RESULT_KEY,
+    GENERATION_RESULT_KEY,
+    PIPELINE_STATUS_KEY,
+    SCAN_RESULT_KEY,
+)
+
+
+def save_scan_result(tool_context: ToolContext, scan_result_json: str) -> dict:
+    """Save the scanner's analysis results to session state.
+
+    Args:
+        scan_result_json: JSON string with keys: services, databases, queues, caches,
+            env_vars, external_apis, language_stack, file_tree_summary, config_files_read
+    """
+    try:
+        data = json.loads(scan_result_json)
+        tool_context.state[SCAN_RESULT_KEY] = data
+        tool_context.state[PIPELINE_STATUS_KEY] = "scanning_complete"
+        return {"status": "success", "message": "Scan result saved"}
+    except json.JSONDecodeError as e:
+        return {"status": "error", "error": f"Invalid JSON: {e}"}
+
+
+def read_scan_result(tool_context: ToolContext) -> dict:
+    """Read the scanner's analysis results from session state."""
+    result = tool_context.state.get(SCAN_RESULT_KEY)
+    if not result:
+        return {"status": "error", "error": "No scan result found in state"}
+    return {"status": "success", "scan_result": json.dumps(result, indent=2)}
+
+
+def save_detection_result(tool_context: ToolContext, detection_result_json: str) -> dict:
+    """Save the detector's analysis results to session state.
+
+    Args:
+        detection_result_json: JSON string with keys: pii_fields, side_effect_services,
+            compliance_flags, secret_placeholders, risk_summary
+    """
+    try:
+        data = json.loads(detection_result_json)
+        tool_context.state[DETECTION_RESULT_KEY] = data
+        tool_context.state[PIPELINE_STATUS_KEY] = "detecting_complete"
+        return {"status": "success", "message": "Detection result saved"}
+    except json.JSONDecodeError as e:
+        return {"status": "error", "error": f"Invalid JSON: {e}"}
+
+
+def read_detection_result(tool_context: ToolContext) -> dict:
+    """Read the detector's analysis results from session state."""
+    result = tool_context.state.get(DETECTION_RESULT_KEY)
+    if not result:
+        return {"status": "error", "error": "No detection result found in state"}
+    return {"status": "success", "detection_result": json.dumps(result, indent=2)}
+
+
+def save_generation_result(tool_context: ToolContext, generation_result_json: str) -> dict:
+    """Save the generator's output to session state.
+
+    Args:
+        generation_result_json: JSON string with keys: files_generated, branch_name,
+            merge_request_url, summary
+    """
+    try:
+        data = json.loads(generation_result_json)
+        tool_context.state[GENERATION_RESULT_KEY] = data
+        tool_context.state[PIPELINE_STATUS_KEY] = "complete"
+        return {"status": "success", "message": "Generation result saved"}
+    except json.JSONDecodeError as e:
+        return {"status": "error", "error": f"Invalid JSON: {e}"}
+
+
+def read_generation_result(tool_context: ToolContext) -> dict:
+    """Read the generator's output from session state."""
+    result = tool_context.state.get(GENERATION_RESULT_KEY)
+    if not result:
+        return {"status": "error", "error": "No generation result found in state"}
+    return {"status": "success", "generation_result": json.dumps(result, indent=2)}

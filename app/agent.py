@@ -1,0 +1,116 @@
+"""
+Do It Local — ADK Agent Definitions.
+
+Sequential pipeline: Scanner → Detector → Generator
+Analyzes GitLab repos, detects PII/sensitive data, generates local dev configs.
+"""
+import os
+
+from google.adk import Agent
+from google.adk.agents import SequentialAgent
+from google.genai import types
+
+from .callbacks import after_model_callback, before_model_callback
+from .config import get_model, get_temperature, get_thinking_config
+from .prompts import DETECTOR_INSTRUCTION, GENERATOR_INSTRUCTION, SCANNER_INSTRUCTION
+from .tools import (
+    commit_files,
+    create_branch,
+    # GitLab REST tools
+    list_repo_tree,
+    read_detection_result,
+    read_file,
+    read_scan_result,
+    save_detection_result,
+    save_generation_result,
+    # State tools
+    save_scan_result,
+)
+
+# Configure auth mode for Vertex AI vs API key
+if os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() == "true":
+    import google.auth
+
+    _, project_id = google.auth.default()
+    os.environ.setdefault("GOOGLE_CLOUD_PROJECT", project_id or "")
+    os.environ.setdefault("GOOGLE_CLOUD_LOCATION", "global")
+
+
+# =============================================================================
+# SCANNER AGENT — reads repo, builds dependency graph
+# =============================================================================
+
+scanner_agent = Agent(
+    name="scanner",
+    model=get_model("scanner"),
+    description="Scans GitLab repositories to identify services, databases, queues, env vars, and dependencies",
+    instruction=SCANNER_INSTRUCTION,
+    generate_content_config=types.GenerateContentConfig(
+        temperature=get_temperature("scanner"),
+        thinking_config=get_thinking_config("scanner"),
+    ),
+    before_model_callback=before_model_callback,
+    after_model_callback=after_model_callback,
+    tools=[
+        list_repo_tree,
+        read_file,
+        save_scan_result,
+        # MCP tools (semantic_code_search, search) added at runtime if available
+    ],
+)
+
+# =============================================================================
+# DETECTOR AGENT — analyzes scan for PII, side-effects, compliance
+# =============================================================================
+
+detector_agent = Agent(
+    name="detector",
+    model=get_model("detector"),
+    description="Analyzes scan results to detect PII fields, side-effect services, and compliance concerns",
+    instruction=DETECTOR_INSTRUCTION,
+    generate_content_config=types.GenerateContentConfig(
+        temperature=get_temperature("detector"),
+        thinking_config=get_thinking_config("detector"),
+    ),
+    before_model_callback=before_model_callback,
+    after_model_callback=after_model_callback,
+    tools=[
+        read_scan_result,
+        save_detection_result,
+    ],
+)
+
+# =============================================================================
+# GENERATOR AGENT — produces configs, commits, creates MR
+# =============================================================================
+
+generator_agent = Agent(
+    name="generator",
+    model=get_model("generator"),
+    description="Generates docker-compose, .env, seed scripts and delivers as GitLab merge request",
+    instruction=GENERATOR_INSTRUCTION,
+    generate_content_config=types.GenerateContentConfig(
+        temperature=get_temperature("generator"),
+        thinking_config=get_thinking_config("generator"),
+    ),
+    before_model_callback=before_model_callback,
+    after_model_callback=after_model_callback,
+    tools=[
+        read_scan_result,
+        read_detection_result,
+        create_branch,
+        commit_files,
+        save_generation_result,
+        # MCP create_merge_request added at runtime if available
+    ],
+)
+
+# =============================================================================
+# PIPELINE — Sequential: Scanner → Detector → Generator
+# =============================================================================
+
+root_agent = SequentialAgent(
+    name="do_it_local_pipeline",
+    description="Analyzes a GitLab repo and generates local dev environment configuration",
+    sub_agents=[scanner_agent, detector_agent, generator_agent],
+)
