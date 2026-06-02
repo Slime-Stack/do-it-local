@@ -27,7 +27,7 @@ steps:
       - 'managed'
       - '--allow-unauthenticated'
       - '--set-secrets'
-      - 'GOOGLE_API_KEY=GEMINI_API_KEY:latest,API_KEY=API_KEY:latest'
+      - 'GOOGLE_API_KEY=GOOGLE_API_KEY:latest,API_KEY=API_KEY:latest'
       - '--cpu'
       - '2'
       - '--memory'
