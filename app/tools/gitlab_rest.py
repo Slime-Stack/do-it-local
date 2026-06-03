@@ -67,12 +67,24 @@ def list_repo_tree(
         return {"status": "error", "error": str(e)}
 
 
-def read_file(tool_context: ToolContext, file_path: str, ref: str = "main") -> dict:
+def read_file(
+    tool_context: ToolContext,
+    file_path: str,
+    ref: str = "main",
+    offset: int = 0,
+    limit: int = 500,
+) -> dict:
     """Read a file's contents from a GitLab repository.
+
+    Returns up to `limit` lines starting from line `offset`. If the file
+    has more lines beyond the returned range, `truncated` will be true
+    and you can call again with a higher `offset` to read the rest.
 
     Args:
         file_path: Path to the file within the repository.
         ref: Branch or commit ref.
+        offset: Line to start from (0-based). Default 0.
+        limit: Max lines to return. Default 500.
     """
     try:
         gl, project_path = _get_client(tool_context)
@@ -80,16 +92,16 @@ def read_file(tool_context: ToolContext, file_path: str, ref: str = "main") -> d
         f = project.files.get(file_path=file_path, ref=ref)
         content = f.decode().decode("utf-8")
         lines = content.splitlines()
-        truncated = len(lines) > 200
-        if truncated:
-            content = "\n".join(lines[:200])
+        total = len(lines)
+        chunk = lines[offset : offset + limit]
         return {
             "status": "success",
             "file_path": file_path,
-            "content": content,
-            "size": len(content),
-            "truncated": truncated,
-            "total_lines": len(lines),
+            "content": "\n".join(chunk),
+            "offset": offset,
+            "lines_returned": len(chunk),
+            "total_lines": total,
+            "truncated": (offset + limit) < total,
         }
     except Exception as e:
         logger.error("read_file failed for %s: %s", file_path, e)
