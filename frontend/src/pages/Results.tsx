@@ -285,9 +285,31 @@ function StrategyTab({ data }: { data: Record<string, unknown> | undefined }) {
   )
 }
 
+function extractFiles(data: Record<string, unknown>): { path: string; content: string }[] {
+  // Try files_generated array first
+  const filesArr = arr(data.files_generated || data.files || data.committed_files)
+  if (filesArr.length > 0) {
+    return filesArr.map((f, i) => ({
+      path: str(f.file_path || f.path || f.name || f.filename || `file-${i}`),
+      content: str(f.content || ''),
+    }))
+  }
+  // Try as an object keyed by filename
+  for (const key of ['files', 'generated_files', 'files_generated']) {
+    const obj = data[key]
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+      return Object.entries(obj as Record<string, unknown>).map(([k, v]) => ({
+        path: k,
+        content: str(v),
+      }))
+    }
+  }
+  return []
+}
+
 function GenerationTab({ data }: { data: Record<string, unknown> | undefined }) {
   if (!data) return <NoData />
-  const files = arr(data.files_generated)
+  const files = extractFiles(data)
   const summary = str(data.summary)
   const branchName = str(data.branch_name)
 
@@ -309,10 +331,10 @@ function GenerationTab({ data }: { data: Record<string, unknown> | undefined }) 
         files.map((file, i) => (
           <div key={i} className="rounded-lg border border-gray-800 overflow-hidden">
             <div className="bg-gray-900 px-4 py-2 border-b border-gray-800">
-              <span className="text-sm font-mono text-gray-300">{str(file.file_path || file.path || `file-${i}`)}</span>
+              <span className="text-sm font-mono text-gray-300">{file.path}</span>
             </div>
             <pre className="overflow-auto bg-gray-950 p-4 text-sm text-gray-300 max-h-96">
-              <code>{str(file.content)}</code>
+              <code>{file.content}</code>
             </pre>
           </div>
         ))

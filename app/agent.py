@@ -99,6 +99,7 @@ generator_agent = Agent(
         read_detection_result,
         read_recommendation_result,
         read_file,
+        read_files,
         create_branch,
         commit_files,
         save_generation_result,
