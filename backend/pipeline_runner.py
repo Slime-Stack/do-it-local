@@ -11,6 +11,7 @@ from google.genai import types
 
 from app.agent import root_agent
 from app.constants.state_keys import (
+    ENVIRONMENT_TARGET_KEY,
     GITLAB_TOKEN_KEY,
     MCP_TOKEN_KEY,
     PIPELINE_STATUS_KEY,
@@ -21,7 +22,7 @@ from backend.event_formatter import format_done, format_event
 
 logger = logging.getLogger(__name__)
 
-_semaphore = asyncio.Semaphore(2)
+_semaphore = asyncio.Semaphore(1)
 
 
 async def stream_pipeline(
@@ -29,6 +30,7 @@ async def stream_pipeline(
     gitlab_token: str,
     mcp_token: str,
     target_branch: str = "main",
+    environment_target: str = "local",
 ) -> AsyncGenerator[str, None]:
     """Run the pipeline and yield SSE-formatted event strings."""
     async with _semaphore:
@@ -39,6 +41,7 @@ async def stream_pipeline(
             state={
                 PROJECT_URL_KEY: project_url,
                 TARGET_BRANCH_KEY: target_branch,
+                ENVIRONMENT_TARGET_KEY: environment_target,
                 GITLAB_TOKEN_KEY: gitlab_token,
                 MCP_TOKEN_KEY: mcp_token,
                 PIPELINE_STATUS_KEY: "scanning",
@@ -53,7 +56,8 @@ async def stream_pipeline(
 
         trigger = (
             f"Analyze the GitLab project at {project_url} and generate "
-            f"local dev environment configuration. Target branch: {target_branch}"
+            f"environment configuration. Target branch: {target_branch}. "
+            f"Environment target: {environment_target}."
         )
 
         heartbeat_count = 0

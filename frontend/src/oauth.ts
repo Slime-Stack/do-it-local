@@ -25,6 +25,7 @@ export async function startOAuthFlow(
   projectUrl: string,
   targetBranch: string,
   gitlabPat: string,
+  environmentTarget: string,
 ): Promise<void> {
   const codeVerifier = generateRandomString(64)
   const codeChallenge = base64UrlEncode(await sha256(codeVerifier))
@@ -35,6 +36,7 @@ export async function startOAuthFlow(
   sessionStorage.setItem('oauth_project_url', projectUrl)
   sessionStorage.setItem('oauth_target_branch', targetBranch)
   sessionStorage.setItem('oauth_gitlab_pat', gitlabPat)
+  sessionStorage.setItem('oauth_environment_target', environmentTarget)
 
   const params = new URLSearchParams({
     client_id: GITLAB_CLIENT_ID,
@@ -54,6 +56,7 @@ export interface OAuthResult {
   gitlabPat: string
   projectUrl: string
   targetBranch: string
+  environmentTarget: string
 }
 
 export async function handleOAuthCallback(): Promise<OAuthResult> {
@@ -83,6 +86,7 @@ export async function handleOAuthCallback(): Promise<OAuthResult> {
   const projectUrl = sessionStorage.getItem('oauth_project_url') || ''
   const targetBranch = sessionStorage.getItem('oauth_target_branch') || 'main'
   const gitlabPat = sessionStorage.getItem('oauth_gitlab_pat') || ''
+  const environmentTarget = sessionStorage.getItem('oauth_environment_target') || 'local'
 
   const tokenRes = await fetch(`${GITLAB_URL}/oauth/token`, {
     method: 'POST',
@@ -108,12 +112,14 @@ export async function handleOAuthCallback(): Promise<OAuthResult> {
   sessionStorage.removeItem('oauth_project_url')
   sessionStorage.removeItem('oauth_target_branch')
   sessionStorage.removeItem('oauth_gitlab_pat')
+  sessionStorage.removeItem('oauth_environment_target')
 
   return {
     mcpToken: tokenData.access_token,
     gitlabPat,
     projectUrl,
     targetBranch,
+    environmentTarget,
   }
 }
 

@@ -1,6 +1,14 @@
 """Request/response Pydantic models."""
 
+from enum import StrEnum
+
 from pydantic import BaseModel, Field, HttpUrl, SecretStr
+
+
+class EnvironmentTarget(StrEnum):
+    LOCAL = "local"
+    STAGING = "staging"
+    BOTH = "both"
 
 
 class PipelineRequest(BaseModel):
@@ -14,3 +22,4 @@ class PipelineRequest(BaseModel):
         description="GitLab OAuth token with mcp scope for MCP operations.",
     )
     target_branch: str = "main"
+    environment_target: EnvironmentTarget = EnvironmentTarget.LOCAL

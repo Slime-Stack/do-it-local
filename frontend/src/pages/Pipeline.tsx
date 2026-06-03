@@ -7,6 +7,7 @@ interface PipelineProps {
   gitlabPat: string
   mcpToken: string
   targetBranch: string
+  environmentTarget: string
   onComplete: (results: DoneEvent['results']) => void
 }
 
@@ -20,12 +21,13 @@ interface ActivityItem {
 const STEPS = [
   { key: 'scanning', label: 'Scanner', description: 'Reading repo structure and dependencies' },
   { key: 'detecting', label: 'Detector', description: 'Identifying PII and side-effect services' },
-  { key: 'generating', label: 'Generator', description: 'Creating docker-compose, .env, and seed scripts' },
+  { key: 'recommending', label: 'Recommender', description: 'Proposing environment strategy' },
+  { key: 'generating', label: 'Generator', description: 'Creating configs and merge request' },
 ]
 
 let nextId = 0
 
-export default function Pipeline({ projectUrl, gitlabPat, mcpToken, targetBranch, onComplete }: PipelineProps) {
+export default function Pipeline({ projectUrl, gitlabPat, mcpToken, targetBranch, environmentTarget, onComplete }: PipelineProps) {
   const [status, setStatus] = useState('scanning')
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [error, setError] = useState('')
@@ -68,7 +70,7 @@ export default function Pipeline({ projectUrl, gitlabPat, mcpToken, targetBranch
       }
     }
 
-    streamPipeline(projectUrl, gitlabPat, mcpToken, targetBranch, handleEvent, controller.signal)
+    streamPipeline(projectUrl, gitlabPat, mcpToken, targetBranch, environmentTarget, handleEvent, controller.signal)
       .catch((err) => {
         if (err.name !== 'AbortError') {
           setError(err.message || 'Stream failed')
@@ -76,7 +78,7 @@ export default function Pipeline({ projectUrl, gitlabPat, mcpToken, targetBranch
       })
 
     return () => controller.abort()
-  }, [projectUrl, gitlabPat, mcpToken, targetBranch, onComplete])
+  }, [projectUrl, gitlabPat, mcpToken, targetBranch, environmentTarget, onComplete])
 
   useEffect(() => {
     feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: 'smooth' })
@@ -87,12 +89,14 @@ export default function Pipeline({ projectUrl, gitlabPat, mcpToken, targetBranch
       scanning: 'scanning',
       scanning_complete: 'detecting',
       detecting: 'detecting',
-      detecting_complete: 'generating',
+      detecting_complete: 'recommending',
+      recommending: 'recommending',
+      recommending_complete: 'generating',
       generating: 'generating',
       complete: 'complete',
     }
     const currentPhase = phases[status] || status
-    const stepOrder = ['scanning', 'detecting', 'generating']
+    const stepOrder = ['scanning', 'detecting', 'recommending', 'generating']
     const currentIdx = stepOrder.indexOf(currentPhase)
     const stepIdx = stepOrder.indexOf(stepKey)
 

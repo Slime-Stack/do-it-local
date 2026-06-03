@@ -9,10 +9,11 @@ export default function Home({ oauthError }: HomeProps) {
   const [projectUrl, setProjectUrl] = useState('')
   const [gitlabPat, setGitlabPat] = useState('')
   const [targetBranch, setTargetBranch] = useState('main')
+  const [environmentTarget, setEnvironmentTarget] = useState('local')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    startOAuthFlow(projectUrl, targetBranch, gitlabPat)
+    startOAuthFlow(projectUrl, targetBranch, gitlabPat, environmentTarget)
   }
 
   return (
@@ -58,17 +59,35 @@ export default function Home({ oauthError }: HomeProps) {
           <p className="mt-1 text-xs text-gray-500">Needs api scope. Used for repo access. Never stored.</p>
         </div>
 
-        <div>
-          <label htmlFor="targetBranch" className="block text-sm font-medium text-gray-300 mb-1">
-            Target Branch
-          </label>
-          <input
-            id="targetBranch"
-            type="text"
-            value={targetBranch}
-            onChange={(e) => setTargetBranch(e.target.value)}
-            className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-3 text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none"
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="targetBranch" className="block text-sm font-medium text-gray-300 mb-1">
+              Target Branch
+            </label>
+            <input
+              id="targetBranch"
+              type="text"
+              value={targetBranch}
+              onChange={(e) => setTargetBranch(e.target.value)}
+              className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-3 text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="environmentTarget" className="block text-sm font-medium text-gray-300 mb-1">
+              Environment
+            </label>
+            <select
+              id="environmentTarget"
+              value={environmentTarget}
+              onChange={(e) => setEnvironmentTarget(e.target.value)}
+              className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-3 text-gray-100 focus:border-blue-500 focus:outline-none"
+            >
+              <option value="local">Local Dev</option>
+              <option value="staging">Staging</option>
+              <option value="both">Both</option>
+            </select>
+          </div>
         </div>
 
         {oauthError && (

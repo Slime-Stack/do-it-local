@@ -26,6 +26,7 @@ export interface DoneEvent {
   results: {
     scan_result?: Record<string, unknown>
     detection_result?: Record<string, unknown>
+    recommendation_result?: Record<string, unknown>
     generation_result?: Record<string, unknown>
   }
 }

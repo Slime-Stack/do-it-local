@@ -7,6 +7,7 @@ export async function streamPipeline(
   gitlabPat: string,
   mcpToken: string,
   targetBranch: string,
+  environmentTarget: string,
   onEvent: (event: PipelineEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
@@ -21,6 +22,7 @@ export async function streamPipeline(
       gitlab_token: gitlabPat,
       mcp_token: mcpToken,
       target_branch: targetBranch,
+      environment_target: environmentTarget,
     }),
     signal,
   })

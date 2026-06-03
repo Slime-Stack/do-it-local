@@ -6,7 +6,7 @@ interface ResultsProps {
   onReset: () => void
 }
 
-type Tab = 'scan' | 'detection' | 'generation'
+type Tab = 'scan' | 'detection' | 'recommendation' | 'generation'
 
 const LANGUAGE_MAP: Record<string, string> = {
   'docker-compose.yml': 'yaml',
@@ -34,6 +34,7 @@ export default function Results({ results, onReset }: ResultsProps) {
   const tabs: { key: Tab; label: string }[] = [
     { key: 'scan', label: 'Scan Summary' },
     { key: 'detection', label: 'Detection Report' },
+    { key: 'recommendation', label: 'Strategy' },
     { key: 'generation', label: 'Generated Files' },
   ]
 
@@ -43,6 +44,8 @@ export default function Results({ results, onReset }: ResultsProps) {
         return results.scan_result
       case 'detection':
         return results.detection_result
+      case 'recommendation':
+        return results.recommendation_result
       case 'generation':
         return results.generation_result
       default:

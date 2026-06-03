@@ -83,6 +83,7 @@ async def pipeline_stream(request: PipelineRequest):
             gitlab_token=request.gitlab_token.get_secret_value(),
             mcp_token=request.mcp_token.get_secret_value(),
             target_branch=request.target_branch,
+            environment_target=request.environment_target,
         ),
         media_type="text/event-stream",
         headers={

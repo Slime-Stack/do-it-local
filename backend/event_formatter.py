@@ -10,6 +10,7 @@ from app.constants.state_keys import (
     DETECTION_RESULT_KEY,
     GENERATION_RESULT_KEY,
     PIPELINE_STATUS_KEY,
+    RECOMMENDATION_RESULT_KEY,
     SCAN_RESULT_KEY,
 )
 
@@ -70,7 +71,13 @@ def format_done(state: dict) -> dict:
     safe_state = {
         k: v
         for k, v in state.items()
-        if k in {SCAN_RESULT_KEY, DETECTION_RESULT_KEY, GENERATION_RESULT_KEY}
+        if k
+        in {
+            SCAN_RESULT_KEY,
+            DETECTION_RESULT_KEY,
+            RECOMMENDATION_RESULT_KEY,
+            GENERATION_RESULT_KEY,
+        }
     }
     return {"type": "done", "results": safe_state}
 

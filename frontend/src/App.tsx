@@ -12,6 +12,7 @@ interface PipelineInput {
   gitlabPat: string
   mcpToken: string
   targetBranch: string
+  environmentTarget: string
 }
 
 function App() {
@@ -24,9 +25,9 @@ function App() {
     if (!hasPendingCallback()) return
 
     handleOAuthCallback()
-      .then(({ mcpToken, gitlabPat, projectUrl, targetBranch }) => {
+      .then(({ mcpToken, gitlabPat, projectUrl, targetBranch, environmentTarget }) => {
         window.history.replaceState({}, '', '/')
-        setInput({ projectUrl, gitlabPat, mcpToken, targetBranch })
+        setInput({ projectUrl, gitlabPat, mcpToken, targetBranch, environmentTarget })
         setView('pipeline')
       })
       .catch((err) => {
@@ -62,6 +63,7 @@ function App() {
             gitlabPat={input.gitlabPat}
             mcpToken={input.mcpToken}
             targetBranch={input.targetBranch}
+            environmentTarget={input.environmentTarget}
             onComplete={handleComplete}
           />
         )}
