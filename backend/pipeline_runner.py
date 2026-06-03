@@ -1,7 +1,9 @@
-"""Async ADK pipeline execution."""
+"""Async ADK pipeline execution — SSE streaming generator."""
 
 import asyncio
+import json
 import logging
+from collections.abc import AsyncGenerator
 
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -9,53 +11,54 @@ from google.genai import types
 
 from app.agent import root_agent
 from app.constants.state_keys import (
-    DETECTION_RESULT_KEY,
-    GENERATION_RESULT_KEY,
+    GITLAB_TOKEN_KEY,
+    MCP_TOKEN_KEY,
     PIPELINE_STATUS_KEY,
     PROJECT_URL_KEY,
-    SCAN_RESULT_KEY,
     TARGET_BRANCH_KEY,
 )
-from app.tools.gitlab_rest import clear_token, set_token
-from backend.job_store import update_job
+from backend.event_formatter import format_done, format_event
 
 logger = logging.getLogger(__name__)
 
 _semaphore = asyncio.Semaphore(2)
 
 
-async def run_pipeline(
-    job_id: str,
+async def stream_pipeline(
     project_url: str,
     gitlab_token: str,
+    mcp_token: str,
     target_branch: str = "main",
-) -> None:
-    """Run the full Scanner -> Detector -> Generator pipeline."""
-    user_id = f"job-{job_id}"
+) -> AsyncGenerator[str, None]:
+    """Run the pipeline and yield SSE-formatted event strings."""
     async with _semaphore:
+        session_service = InMemorySessionService()
+        session = await session_service.create_session(
+            app_name="do_it_local",
+            user_id="sse-user",
+            state={
+                PROJECT_URL_KEY: project_url,
+                TARGET_BRANCH_KEY: target_branch,
+                GITLAB_TOKEN_KEY: gitlab_token,
+                MCP_TOKEN_KEY: mcp_token,
+                PIPELINE_STATUS_KEY: "scanning",
+            },
+        )
+
+        runner = Runner(
+            agent=root_agent,
+            app_name="do_it_local",
+            session_service=session_service,
+        )
+
+        trigger = (
+            f"Analyze the GitLab project at {project_url} and generate "
+            f"local dev environment configuration. Target branch: {target_branch}"
+        )
+
+        heartbeat_count = 0
+
         try:
-            update_job(job_id, status="scanning")
-            set_token(user_id, gitlab_token)
-
-            session_service = InMemorySessionService()
-            session = await session_service.create_session(
-                app_name="do_it_local",
-                user_id=user_id,
-                state={
-                    PROJECT_URL_KEY: project_url,
-                    TARGET_BRANCH_KEY: target_branch,
-                    PIPELINE_STATUS_KEY: "scanning",
-                },
-            )
-
-            runner = Runner(
-                agent=root_agent,
-                app_name="do_it_local",
-                session_service=session_service,
-            )
-
-            trigger = f"Analyze the GitLab project at {project_url} and generate local dev environment configuration. Target branch: {target_branch}"
-
             async for event in runner.run_async(
                 user_id=session.user_id,
                 session_id=session.id,
@@ -64,38 +67,36 @@ async def run_pipeline(
                     parts=[types.Part(text=trigger)],
                 ),
             ):
-                if hasattr(event, "actions") and event.actions:
-                    state = (
-                        event.actions.state_delta
-                        if hasattr(event.actions, "state_delta")
-                        else {}
-                    )
-                    if PIPELINE_STATUS_KEY in state:
-                        status = state[PIPELINE_STATUS_KEY]
-                        if status == "scanning_complete":
-                            update_job(job_id, status="detecting")
-                        elif status == "detecting_complete":
-                            update_job(job_id, status="generating")
+                formatted = format_event(event)
+                if formatted:
+                    yield f"data: {json.dumps(formatted)}\n\n"
+                else:
+                    heartbeat_count += 1
+                    if heartbeat_count % 10 == 0:
+                        yield ": heartbeat\n\n"
 
             final_session = await session_service.get_session(
                 app_name="do_it_local",
                 user_id=session.user_id,
                 session_id=session.id,
             )
-
             state = final_session.state if final_session else {}
-            update_job(
-                job_id,
-                status="complete",
-                scan_result=state.get(SCAN_RESULT_KEY),
-                detection_result=state.get(DETECTION_RESULT_KEY),
-                generation_result=state.get(GENERATION_RESULT_KEY),
-            )
-
-            logger.info("Pipeline complete for job %s", job_id)
+            done_event = format_done(state)
+            yield f"data: {json.dumps(done_event)}\n\n"
 
         except Exception as e:
-            logger.exception("Pipeline failed for job %s", job_id)
-            update_job(job_id, status="error", error=str(e))
+            logger.exception("Pipeline failed")
+            error_event = {"type": "error", "error": str(e)}
+            yield f"data: {json.dumps(error_event)}\n\n"
+
         finally:
-            clear_token(user_id)
+            if session:
+                final = await session_service.get_session(
+                    app_name="do_it_local",
+                    user_id=session.user_id,
+                    session_id=session.id,
+                )
+                if final:
+                    for key in (GITLAB_TOKEN_KEY, MCP_TOKEN_KEY):
+                        if key in final.state:
+                            final.state[key] = ""

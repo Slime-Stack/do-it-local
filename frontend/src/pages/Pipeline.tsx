@@ -1,9 +1,20 @@
-import { useEffect, useState } from 'react'
-import { getJobStatus } from '../api/client'
+import { useEffect, useRef, useState } from 'react'
+import { streamPipeline } from '../api/client'
+import type { DoneEvent, PipelineEvent } from '../types'
 
 interface PipelineProps {
-  jobId: string
-  onComplete: () => void
+  projectUrl: string
+  gitlabPat: string
+  mcpToken: string
+  targetBranch: string
+  onComplete: (results: DoneEvent['results']) => void
+}
+
+interface ActivityItem {
+  id: number
+  agent: string
+  type: string
+  summary: string
 }
 
 const STEPS = [
@@ -12,35 +23,77 @@ const STEPS = [
   { key: 'generating', label: 'Generator', description: 'Creating docker-compose, .env, and seed scripts' },
 ]
 
-export default function Pipeline({ jobId, onComplete }: PipelineProps) {
-  const [status, setStatus] = useState('pending')
+let nextId = 0
+
+export default function Pipeline({ projectUrl, gitlabPat, mcpToken, targetBranch, onComplete }: PipelineProps) {
+  const [status, setStatus] = useState('scanning')
+  const [activity, setActivity] = useState<ActivityItem[]>([])
   const [error, setError] = useState('')
+  const feedRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const result = await getJobStatus(jobId)
-        setStatus(result.status)
+    const controller = new AbortController()
 
-        if (result.status === 'complete') {
-          clearInterval(interval)
-          onComplete()
-        } else if (result.status === 'error') {
-          clearInterval(interval)
-          setError(result.error || 'Pipeline failed')
-        }
-      } catch {
-        clearInterval(interval)
-        setError('Failed to poll job status')
+    const handleEvent = (event: PipelineEvent) => {
+      if (event.type === 'status') {
+        setStatus(event.status)
+        return
       }
-    }, 2000)
 
-    return () => clearInterval(interval)
-  }, [jobId, onComplete])
+      if (event.type === 'done') {
+        onComplete(event.results)
+        return
+      }
+
+      if (event.type === 'error') {
+        setError(event.error)
+        return
+      }
+
+      let summary = ''
+      const agent = 'agent' in event ? event.agent : ''
+
+      if (event.type === 'tool_call') {
+        const args = event.content.args
+        const detail = args.file_path || args.path || args.branch_name || ''
+        summary = `Calling ${event.content.name}${detail ? `: ${detail}` : ''}`
+      } else if (event.type === 'tool_result') {
+        summary = `${event.content.name} returned`
+      } else if (event.type === 'text') {
+        summary = event.content.length > 120 ? event.content.slice(0, 120) + '...' : event.content
+      }
+
+      if (summary) {
+        setActivity((prev) => [...prev.slice(-49), { id: nextId++, agent, type: event.type, summary }])
+      }
+    }
+
+    streamPipeline(projectUrl, gitlabPat, mcpToken, targetBranch, handleEvent, controller.signal)
+      .catch((err) => {
+        if (err.name !== 'AbortError') {
+          setError(err.message || 'Stream failed')
+        }
+      })
+
+    return () => controller.abort()
+  }, [projectUrl, gitlabPat, mcpToken, targetBranch, onComplete])
+
+  useEffect(() => {
+    feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: 'smooth' })
+  }, [activity])
 
   const getStepStatus = (stepKey: string) => {
+    const phases: Record<string, string> = {
+      scanning: 'scanning',
+      scanning_complete: 'detecting',
+      detecting: 'detecting',
+      detecting_complete: 'generating',
+      generating: 'generating',
+      complete: 'complete',
+    }
+    const currentPhase = phases[status] || status
     const stepOrder = ['scanning', 'detecting', 'generating']
-    const currentIdx = stepOrder.indexOf(status)
+    const currentIdx = stepOrder.indexOf(currentPhase)
     const stepIdx = stepOrder.indexOf(stepKey)
 
     if (status === 'complete') return 'complete'
@@ -91,6 +144,24 @@ export default function Pipeline({ jobId, onComplete }: PipelineProps) {
           )
         })}
       </div>
+
+      {activity.length > 0 && (
+        <div className="rounded-lg border border-gray-800 bg-gray-900/50">
+          <div className="border-b border-gray-800 px-4 py-2">
+            <p className="text-sm font-medium text-gray-400">Activity</p>
+          </div>
+          <div ref={feedRef} className="max-h-64 overflow-y-auto p-4 space-y-1">
+            {activity.map((item) => (
+              <div key={item.id} className="text-sm text-gray-300 font-mono">
+                <span className="text-gray-500">{item.agent ? `[${item.agent}] ` : ''}</span>
+                <span className={item.type === 'tool_call' ? 'text-blue-400' : item.type === 'tool_result' ? 'text-green-400' : ''}>
+                  {item.summary}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg border border-red-700 bg-red-950/30 p-4 text-red-300">

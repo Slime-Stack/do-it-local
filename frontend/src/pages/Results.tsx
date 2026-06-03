@@ -1,31 +1,35 @@
-import { useEffect, useState } from 'react'
-import { getJobResults } from '../api/client'
+import { useState } from 'react'
+import type { DoneEvent } from '../types'
 
 interface ResultsProps {
-  jobId: string
+  results: DoneEvent['results']
   onReset: () => void
 }
 
 type Tab = 'scan' | 'detection' | 'generation'
 
-export default function Results({ jobId, onReset }: ResultsProps) {
-  const [results, setResults] = useState<Record<string, unknown> | null>(null)
+const LANGUAGE_MAP: Record<string, string> = {
+  'docker-compose.yml': 'yaml',
+  'docker-compose.yaml': 'yaml',
+  '.env.local': 'bash',
+  'seed.sh': 'bash',
+  'seed.py': 'python',
+  'README.local.md': 'markdown',
+}
+
+function detectLanguage(filePath: string): string {
+  for (const [pattern, lang] of Object.entries(LANGUAGE_MAP)) {
+    if (filePath.endsWith(pattern)) return lang
+  }
+  if (filePath.endsWith('.yml') || filePath.endsWith('.yaml')) return 'yaml'
+  if (filePath.endsWith('.py')) return 'python'
+  if (filePath.endsWith('.sh')) return 'bash'
+  if (filePath.endsWith('.md')) return 'markdown'
+  return 'text'
+}
+
+export default function Results({ results, onReset }: ResultsProps) {
   const [tab, setTab] = useState<Tab>('scan')
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    getJobResults(jobId)
-      .then(setResults)
-      .catch(() => setError('Failed to load results'))
-  }, [jobId])
-
-  if (error) {
-    return <div className="text-red-400">{error}</div>
-  }
-
-  if (!results) {
-    return <div className="text-gray-400">Loading results...</div>
-  }
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'scan', label: 'Scan Summary' },
@@ -48,6 +52,7 @@ export default function Results({ jobId, onReset }: ResultsProps) {
 
   const content = getContent()
   const mrUrl = (results.generation_result as Record<string, unknown>)?.merge_request_url as string | undefined
+  const filesGenerated = (results.generation_result as Record<string, unknown>)?.files_generated as Array<Record<string, string>> | undefined
 
   return (
     <div className="space-y-6">
@@ -66,9 +71,9 @@ export default function Results({ jobId, onReset }: ResultsProps) {
           href={mrUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="block rounded-lg border border-green-700 bg-green-950/20 p-4 text-green-300 hover:bg-green-950/40 transition-colors"
+          className="block rounded-lg border border-green-700 bg-green-950/20 p-4 text-green-300 hover:bg-green-950/40 transition-colors text-center font-semibold"
         >
-          Merge Request Created &rarr;
+          View Merge Request on GitLab &rarr;
         </a>
       )}
 
@@ -88,9 +93,25 @@ export default function Results({ jobId, onReset }: ResultsProps) {
         ))}
       </div>
 
-      <pre className="overflow-auto rounded-lg bg-gray-900 border border-gray-800 p-4 text-sm text-gray-300">
-        {content ? JSON.stringify(content, null, 2) : 'No data available'}
-      </pre>
+      {tab === 'generation' && filesGenerated ? (
+        <div className="space-y-4">
+          {filesGenerated.map((file) => (
+            <div key={file.file_path} className="rounded-lg border border-gray-800 overflow-hidden">
+              <div className="bg-gray-900 px-4 py-2 border-b border-gray-800 flex items-center justify-between">
+                <span className="text-sm font-mono text-gray-300">{file.file_path}</span>
+                <span className="text-xs text-gray-500">{detectLanguage(file.file_path)}</span>
+              </div>
+              <pre className="overflow-auto bg-gray-950 p-4 text-sm text-gray-300 max-h-96">
+                <code>{file.content}</code>
+              </pre>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <pre className="overflow-auto rounded-lg bg-gray-900 border border-gray-800 p-4 text-sm text-gray-300">
+          {content ? JSON.stringify(content, null, 2) : 'No data available'}
+        </pre>
+      )}
     </div>
   )
 }

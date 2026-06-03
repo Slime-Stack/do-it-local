@@ -1,10 +1,14 @@
-.PHONY: install dev agent api test lint clean
+.PHONY: install dev api frontend agent test lint clean
 
 install:
 	uv sync
 
 dev: install
-	uv run uvicorn backend.main:app --reload --port 8080
+	@echo "Starting backend on :8080 and frontend on :5173..."
+	@trap 'kill 0' INT TERM; \
+	uv run uvicorn backend.main:app --reload --port 8080 --env-file .env & \
+	cd frontend && npx vite & \
+	wait
 
 agent:
 	uv run adk web app

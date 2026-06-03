@@ -1,8 +1,7 @@
 """GitLab REST API tools wrapping python-gitlab.
 
 Fills gaps in the GitLab MCP server (no file read, tree list, branch
-create, or commit tools). PATs are provided per-request and held in
-memory only for the pipeline duration.
+create, or commit tools). Token is read from ADK session state.
 """
 
 import json
@@ -12,29 +11,21 @@ import os
 import gitlab
 from google.adk.tools import ToolContext
 
-from app.constants.state_keys import PROJECT_URL_KEY
+from app.constants.state_keys import GITLAB_TOKEN_KEY, PROJECT_URL_KEY
 
 logger = logging.getLogger(__name__)
 
-_token_store: dict[str, str] = {}
-
-
-def set_token(user_id: str, token: str) -> None:
-    _token_store[user_id] = token
-
-
-def clear_token(user_id: str) -> None:
-    _token_store.pop(user_id, None)
-
 
 def _get_client(tool_context: ToolContext) -> tuple[gitlab.Gitlab, str]:
-    user_id = getattr(tool_context, "user_id", None) or ""
-    token = _token_store.get(user_id)
+    token = tool_context.state.get(GITLAB_TOKEN_KEY, "")
     if not token:
-        raise ValueError("No GitLab token available for this session")
+        raise ValueError("No GitLab token available in session state")
 
     gitlab_url = os.getenv("GITLAB_URL", "https://gitlab.com")
-    gl = gitlab.Gitlab(gitlab_url, private_token=token)
+    if token.startswith("glpat-"):
+        gl = gitlab.Gitlab(gitlab_url, private_token=token)
+    else:
+        gl = gitlab.Gitlab(gitlab_url, oauth_token=token)
 
     project_url = tool_context.state.get(PROJECT_URL_KEY, "")
     if not project_url:

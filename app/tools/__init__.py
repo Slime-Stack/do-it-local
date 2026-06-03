@@ -1,3 +1,4 @@
+from .gitlab_mcp import get_gitlab_mcp_tools
 from .gitlab_rest import (
     commit_files,
     create_branch,
@@ -16,6 +17,7 @@ from .state_tools import (
 __all__ = [
     "commit_files",
     "create_branch",
+    "get_gitlab_mcp_tools",
     "list_repo_tree",
     "read_detection_result",
     "read_file",

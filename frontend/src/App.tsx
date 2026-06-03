@@ -1,30 +1,49 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Home from './pages/Home'
 import Pipeline from './pages/Pipeline'
 import Results from './pages/Results'
+import { handleOAuthCallback, hasPendingCallback } from './oauth'
+import type { DoneEvent } from './types'
 
 type View = 'home' | 'pipeline' | 'results'
 
-interface JobState {
-  jobId: string
+interface PipelineInput {
   projectUrl: string
+  gitlabPat: string
+  mcpToken: string
+  targetBranch: string
 }
 
 function App() {
   const [view, setView] = useState<View>('home')
-  const [job, setJob] = useState<JobState | null>(null)
+  const [input, setInput] = useState<PipelineInput | null>(null)
+  const [results, setResults] = useState<DoneEvent['results'] | null>(null)
+  const [oauthError, setOauthError] = useState('')
 
-  const handleJobCreated = (jobId: string, projectUrl: string) => {
-    setJob({ jobId, projectUrl })
-    setView('pipeline')
-  }
+  useEffect(() => {
+    if (!hasPendingCallback()) return
 
-  const handlePipelineComplete = () => {
+    handleOAuthCallback()
+      .then(({ mcpToken, gitlabPat, projectUrl, targetBranch }) => {
+        window.history.replaceState({}, '', '/')
+        setInput({ projectUrl, gitlabPat, mcpToken, targetBranch })
+        setView('pipeline')
+      })
+      .catch((err) => {
+        window.history.replaceState({}, '', '/')
+        setOauthError(err.message)
+      })
+  }, [])
+
+  const handleComplete = (r: DoneEvent['results']) => {
+    setResults(r)
     setView('results')
   }
 
   const handleReset = () => {
-    setJob(null)
+    setInput(null)
+    setResults(null)
+    setOauthError('')
     setView('home')
   }
 
@@ -36,12 +55,18 @@ function App() {
         </button>
       </header>
       <main className="mx-auto max-w-4xl px-6 py-12">
-        {view === 'home' && <Home onJobCreated={handleJobCreated} />}
-        {view === 'pipeline' && job && (
-          <Pipeline jobId={job.jobId} onComplete={handlePipelineComplete} />
+        {view === 'home' && <Home oauthError={oauthError} />}
+        {view === 'pipeline' && input && (
+          <Pipeline
+            projectUrl={input.projectUrl}
+            gitlabPat={input.gitlabPat}
+            mcpToken={input.mcpToken}
+            targetBranch={input.targetBranch}
+            onComplete={handleComplete}
+          />
         )}
-        {view === 'results' && job && (
-          <Results jobId={job.jobId} onReset={handleReset} />
+        {view === 'results' && results && (
+          <Results results={results} onReset={handleReset} />
         )}
       </main>
     </div>

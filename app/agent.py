@@ -15,6 +15,7 @@ from .prompts import DETECTOR_INSTRUCTION, GENERATOR_INSTRUCTION, SCANNER_INSTRU
 from .tools import (
     commit_files,
     create_branch,
+    get_gitlab_mcp_tools,
     list_repo_tree,
     read_detection_result,
     read_file,
@@ -31,11 +32,12 @@ if os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() == "true":
     os.environ.setdefault("GOOGLE_CLOUD_PROJECT", project_id or "")
     os.environ.setdefault("GOOGLE_CLOUD_LOCATION", "global")
 
+gitlab_mcp = get_gitlab_mcp_tools()
 
 scanner_agent = Agent(
     name="scanner",
     model=get_model("scanner"),
-    description="Scans GitLab repositories to identify services, databases, queues, env vars, and dependencies",
+    description="Scans repositories to identify services, databases, queues, env vars, and dependencies",
     instruction=SCANNER_INSTRUCTION,
     generate_content_config=types.GenerateContentConfig(
         temperature=get_temperature("scanner"),
@@ -43,7 +45,7 @@ scanner_agent = Agent(
     ),
     before_model_callback=before_model_callback,
     after_model_callback=after_model_callback,
-    tools=[list_repo_tree, read_file, save_scan_result],
+    tools=[list_repo_tree, read_file, save_scan_result, gitlab_mcp],
 )
 
 detector_agent = Agent(
@@ -74,9 +76,11 @@ generator_agent = Agent(
     tools=[
         read_scan_result,
         read_detection_result,
+        read_file,
         create_branch,
         commit_files,
         save_generation_result,
+        gitlab_mcp,
     ],
 )
 

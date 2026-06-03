@@ -1,30 +1,18 @@
 import { useState } from 'react'
-import { createJob } from '../api/client'
+import { startOAuthFlow } from '../oauth'
 
 interface HomeProps {
-  onJobCreated: (jobId: string, projectUrl: string) => void
+  oauthError?: string
 }
 
-export default function Home({ onJobCreated }: HomeProps) {
+export default function Home({ oauthError }: HomeProps) {
   const [projectUrl, setProjectUrl] = useState('')
-  const [gitlabToken, setGitlabToken] = useState('')
+  const [gitlabPat, setGitlabPat] = useState('')
   const [targetBranch, setTargetBranch] = useState('main')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
-    setLoading(true)
-
-    try {
-      const result = await createJob(projectUrl, gitlabToken, targetBranch)
-      onJobCreated(result.job_id, projectUrl)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create job')
-    } finally {
-      setLoading(false)
-    }
+    startOAuthFlow(projectUrl, targetBranch, gitlabPat)
   }
 
   return (
@@ -55,19 +43,19 @@ export default function Home({ onJobCreated }: HomeProps) {
         </div>
 
         <div>
-          <label htmlFor="gitlabToken" className="block text-sm font-medium text-gray-300 mb-1">
+          <label htmlFor="gitlabPat" className="block text-sm font-medium text-gray-300 mb-1">
             GitLab Personal Access Token
           </label>
           <input
-            id="gitlabToken"
+            id="gitlabPat"
             type="password"
             required
             placeholder="glpat-..."
-            value={gitlabToken}
-            onChange={(e) => setGitlabToken(e.target.value)}
+            value={gitlabPat}
+            onChange={(e) => setGitlabPat(e.target.value)}
             className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-3 text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none"
           />
-          <p className="mt-1 text-xs text-gray-500">Needs api scope. Never stored permanently.</p>
+          <p className="mt-1 text-xs text-gray-500">Needs api scope. Used for repo access. Never stored.</p>
         </div>
 
         <div>
@@ -83,17 +71,23 @@ export default function Home({ onJobCreated }: HomeProps) {
           />
         </div>
 
-        {error && (
-          <p className="text-red-400 text-sm">{error}</p>
+        {oauthError && (
+          <p className="text-red-400 text-sm">{oauthError}</p>
         )}
 
         <button
           type="submit"
-          disabled={loading}
-          className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-full rounded-lg bg-[#e24329] px-4 py-3 font-semibold text-white hover:bg-[#fc6d26] transition-colors flex items-center justify-center gap-2"
         >
-          {loading ? 'Creating job...' : 'Analyze Repository'}
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M23.955 13.587l-1.342-4.135-2.664-8.189a.455.455 0 00-.867 0L16.418 9.45H7.582L4.918 1.263a.455.455 0 00-.867 0L1.386 9.452.044 13.587a.924.924 0 00.331 1.023L12 23.054l11.625-8.443a.92.92 0 00.33-1.024" />
+          </svg>
+          Connect with GitLab &amp; Analyze
         </button>
+
+        <p className="text-center text-xs text-gray-600">
+          You'll authorize via GitLab OAuth for MCP access. Your PAT handles repo operations.
+        </p>
       </form>
     </div>
   )
