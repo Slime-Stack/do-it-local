@@ -18,15 +18,26 @@ def _gitlab_header_provider(ctx):
     return {"Authorization": f"Bearer {token}"} if token else {}
 
 
-def get_gitlab_mcp_tools():
-    """Create McpToolset for GitLab MCP server."""
+def _mcp_params():
     gitlab_url = os.getenv("GITLAB_URL", "https://gitlab.com")
-    mcp_endpoint = f"{gitlab_url}/api/v4/mcp"
+    return StreamableHTTPConnectionParams(
+        url=f"{gitlab_url}/api/v4/mcp",
+        timeout=30.0,
+    )
 
+
+def get_gitlab_mcp_tools():
+    """Full MCP toolset — all available GitLab MCP tools."""
     return McpToolset(
-        connection_params=StreamableHTTPConnectionParams(
-            url=mcp_endpoint,
-            timeout=30.0,
-        ),
+        connection_params=_mcp_params(),
+        header_provider=_gitlab_header_provider,
+    )
+
+
+def get_gitlab_mcp_generator_tools():
+    """Filtered MCP toolset for Generator — only MR and issue creation."""
+    return McpToolset(
+        connection_params=_mcp_params(),
+        tool_filter=["create_merge_request", "create_issue"],
         header_provider=_gitlab_header_provider,
     )

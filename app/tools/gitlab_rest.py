@@ -200,7 +200,16 @@ def commit_files(
     try:
         gl, project_path = _get_client(tool_context)
         project = gl.projects.get(project_path)
-        files = json.loads(files_json)
+        # Sanitize control characters that break JSON parsing
+        sanitized = files_json.replace("\t", "    ")
+        # Remove ASCII control chars except newline (\n) and carriage return (\r)
+        sanitized = "".join(
+            c if c in ("\n", "\r") or ord(c) >= 32 else " " for c in sanitized
+        )
+        try:
+            files = json.loads(sanitized)
+        except json.JSONDecodeError as e:
+            return {"status": "error", "error": f"Invalid JSON in files_json: {e}"}
         actions = [
             {"action": "create", "file_path": f["file_path"], "content": f["content"]}
             for f in files

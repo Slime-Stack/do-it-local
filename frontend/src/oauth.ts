@@ -88,6 +88,14 @@ export async function handleOAuthCallback(): Promise<OAuthResult> {
   const gitlabPat = sessionStorage.getItem('oauth_gitlab_pat') || ''
   const environmentTarget = sessionStorage.getItem('oauth_environment_target') || 'local'
 
+  console.log('OAuth token exchange:', {
+    client_id: GITLAB_CLIENT_ID.slice(0, 8) + '...',
+    redirect_uri: REDIRECT_URI,
+    code: code.slice(0, 8) + '...',
+    code_verifier_length: codeVerifier.length,
+    state_match: state === savedState,
+  })
+
   const tokenRes = await fetch(`${GITLAB_URL}/oauth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -101,8 +109,13 @@ export async function handleOAuthCallback(): Promise<OAuthResult> {
   })
 
   if (!tokenRes.ok) {
-    const text = await tokenRes.text().catch(() => tokenRes.statusText)
-    throw new Error(`Token exchange failed (${tokenRes.status}): ${text}`)
+    const body = await tokenRes.text().catch(() => '')
+    console.error('OAuth token exchange failed:', tokenRes.status, body)
+    throw new Error(
+      tokenRes.status === 400
+        ? 'Authorization expired. Please try again.'
+        : `GitLab token exchange failed: ${body || tokenRes.statusText}`
+    )
   }
 
   const tokenData = await tokenRes.json()
@@ -124,5 +137,9 @@ export async function handleOAuthCallback(): Promise<OAuthResult> {
 }
 
 export function hasPendingCallback(): boolean {
-  return window.location.pathname === '/oauth/callback' && !!new URLSearchParams(window.location.search).get('code')
+  return (
+    window.location.pathname === '/oauth/callback' &&
+    !!new URLSearchParams(window.location.search).get('code') &&
+    !!sessionStorage.getItem('oauth_code_verifier')
+  )
 }

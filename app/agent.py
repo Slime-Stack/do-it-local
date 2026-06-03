@@ -20,6 +20,7 @@ from .prompts import (
 from .tools import (
     commit_files,
     create_branch,
+    get_gitlab_mcp_generator_tools,
     get_gitlab_mcp_tools,
     read_detection_result,
     read_file,
@@ -40,6 +41,7 @@ if os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() == "true":
     os.environ.setdefault("GOOGLE_CLOUD_LOCATION", "global")
 
 gitlab_mcp = get_gitlab_mcp_tools()
+gitlab_mcp_generator = get_gitlab_mcp_generator_tools()
 
 scanner_agent = Agent(
     name="scanner",
@@ -98,12 +100,11 @@ generator_agent = Agent(
         read_scan_result,
         read_detection_result,
         read_recommendation_result,
-        read_file,
         read_files,
         create_branch,
         commit_files,
         save_generation_result,
-        gitlab_mcp,
+        gitlab_mcp_generator,
     ],
 )
 

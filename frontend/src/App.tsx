@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Home from './pages/Home'
 import Pipeline from './pages/Pipeline'
 import Results from './pages/Results'
@@ -20,10 +20,21 @@ function App() {
   const [input, setInput] = useState<PipelineInput | null>(null)
   const [results, setResults] = useState<DoneEvent['results'] | null>(null)
   const [oauthError, setOauthError] = useState('')
+  const oauthHandled = useRef(false)
 
   useEffect(() => {
-    if (!hasPendingCallback()) return
+    if (oauthHandled.current) return
 
+    if (window.location.pathname === '/oauth/callback') {
+      if (!hasPendingCallback()) {
+        window.history.replaceState({}, '', '/')
+        return
+      }
+    } else {
+      return
+    }
+
+    oauthHandled.current = true
     handleOAuthCallback()
       .then(({ mcpToken, gitlabPat, projectUrl, targetBranch, environmentTarget }) => {
         window.history.replaceState({}, '', '/')
