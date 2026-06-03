@@ -23,6 +23,7 @@ from .tools import (
     get_gitlab_mcp_tools,
     read_detection_result,
     read_file,
+    read_files,
     read_recommendation_result,
     read_scan_result,
     save_detection_result,
@@ -51,7 +52,7 @@ scanner_agent = Agent(
     ),
     before_model_callback=before_model_callback,
     after_model_callback=after_model_callback,
-    tools=[read_file, save_scan_result, gitlab_mcp],
+    tools=[read_file, read_files, save_scan_result, gitlab_mcp],
 )
 
 detector_agent = Agent(

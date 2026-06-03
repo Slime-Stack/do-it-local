@@ -4,6 +4,7 @@ from .gitlab_rest import (
     create_branch,
     list_repo_tree,
     read_file,
+    read_files,
 )
 from .state_tools import (
     read_detection_result,
@@ -23,6 +24,7 @@ __all__ = [
     "list_repo_tree",
     "read_detection_result",
     "read_file",
+    "read_files",
     "read_generation_result",
     "read_recommendation_result",
     "read_scan_result",

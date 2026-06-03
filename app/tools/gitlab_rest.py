@@ -16,6 +16,18 @@ from app.constants.state_keys import GITLAB_TOKEN_KEY, PROJECT_URL_KEY
 logger = logging.getLogger(__name__)
 
 
+def _extract_project_path(project_url: str) -> str:
+    gitlab_url = os.getenv("GITLAB_URL", "https://gitlab.com")
+    path = str(project_url).strip().rstrip("/")
+    if path.endswith(".git"):
+        path = path[:-4]
+    for prefix in [f"{gitlab_url}/", "https://gitlab.com/", "http://gitlab.com/"]:
+        if path.startswith(prefix):
+            path = path[len(prefix) :]
+            break
+    return path
+
+
 def _get_client(tool_context: ToolContext) -> tuple[gitlab.Gitlab, str]:
     token = tool_context.state.get(GITLAB_TOKEN_KEY, "")
     if not token:
@@ -31,14 +43,8 @@ def _get_client(tool_context: ToolContext) -> tuple[gitlab.Gitlab, str]:
     if not project_url:
         raise ValueError("No project_url found in state")
 
-    path = project_url.rstrip("/")
-    if path.endswith(".git"):
-        path = path[:-4]
-    for prefix in [f"{gitlab_url}/", "https://gitlab.com/", "http://gitlab.com/"]:
-        if path.startswith(prefix):
-            path = path[len(prefix) :]
-            break
-
+    path = _extract_project_path(project_url)
+    logger.info("Resolved project path: %s", path)
     return gl, path
 
 
@@ -106,6 +112,53 @@ def read_file(
     except Exception as e:
         logger.error("read_file failed for %s: %s", file_path, e)
         return {"status": "error", "error": str(e)}
+
+
+def read_files(
+    tool_context: ToolContext, file_paths_json: str, ref: str = "main"
+) -> dict:
+    """Read multiple files at once from a GitLab repository.
+
+    Use this instead of calling read_file multiple times. Returns all
+    file contents in a single response.
+
+    Args:
+        file_paths_json: JSON array of file path strings, e.g. '["README.md", "package.json"]'
+        ref: Branch or commit ref.
+    """
+    try:
+        file_paths = json.loads(file_paths_json)
+    except json.JSONDecodeError as e:
+        return {"status": "error", "error": f"Invalid JSON: {e}"}
+
+    gl, project_path = _get_client(tool_context)
+    project = gl.projects.get(project_path)
+
+    results = []
+    for fp in file_paths:
+        try:
+            f = project.files.get(file_path=fp, ref=ref)
+            content = f.decode().decode("utf-8")
+            lines = content.splitlines()
+            total = len(lines)
+            chunk = lines[:500]
+            results.append(
+                {
+                    "status": "success",
+                    "file_path": fp,
+                    "content": "\n".join(chunk),
+                    "total_lines": total,
+                    "truncated": total > 500,
+                }
+            )
+        except Exception as e:
+            results.append({"status": "error", "file_path": fp, "error": str(e)})
+
+    return {
+        "status": "success",
+        "files_read": len(results),
+        "files": results,
+    }
 
 
 def create_branch(

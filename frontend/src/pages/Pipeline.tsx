@@ -32,8 +32,12 @@ export default function Pipeline({ projectUrl, gitlabPat, mcpToken, targetBranch
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [error, setError] = useState('')
   const feedRef = useRef<HTMLDivElement>(null)
+  const startedRef = useRef(false)
 
   useEffect(() => {
+    if (startedRef.current) return
+    startedRef.current = true
+
     const controller = new AbortController()
 
     const handleEvent = (event: PipelineEvent) => {

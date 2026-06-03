@@ -36,14 +36,10 @@ def _fetch_repo_tree(project_url: str, gitlab_token: str) -> str:
     else:
         gl = gitlab.Gitlab(gitlab_url, oauth_token=gitlab_token)
 
-    path = project_url.rstrip("/")
-    if path.endswith(".git"):
-        path = path[:-4]
-    for prefix in [f"{gitlab_url}/", "https://gitlab.com/", "http://gitlab.com/"]:
-        if path.startswith(prefix):
-            path = path[len(prefix) :]
-            break
+    from app.tools.gitlab_rest import _extract_project_path
 
+    path = _extract_project_path(project_url)
+    logger.info("Pre-fetching tree for project: %s", path)
     project = gl.projects.get(path)
     items = project.repository_tree(recursive=True, per_page=100, get_all=True)
     tree_lines = [f"  {item['type'][0]} {item['path']}" for item in items]
