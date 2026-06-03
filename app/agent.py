@@ -21,7 +21,6 @@ from .tools import (
     commit_files,
     create_branch,
     get_gitlab_mcp_tools,
-    list_repo_tree,
     read_detection_result,
     read_file,
     read_recommendation_result,
@@ -52,7 +51,7 @@ scanner_agent = Agent(
     ),
     before_model_callback=before_model_callback,
     after_model_callback=after_model_callback,
-    tools=[list_repo_tree, read_file, save_scan_result, gitlab_mcp],
+    tools=[read_file, save_scan_result, gitlab_mcp],
 )
 
 detector_agent = Agent(

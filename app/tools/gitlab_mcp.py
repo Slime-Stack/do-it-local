@@ -28,6 +28,5 @@ def get_gitlab_mcp_tools():
             url=mcp_endpoint,
             timeout=30.0,
         ),
-        tool_filter=["search", "create_merge_request"],
         header_provider=_gitlab_header_provider,
     )

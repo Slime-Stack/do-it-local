@@ -79,11 +79,17 @@ def read_file(tool_context: ToolContext, file_path: str, ref: str = "main") -> d
         project = gl.projects.get(project_path)
         f = project.files.get(file_path=file_path, ref=ref)
         content = f.decode().decode("utf-8")
+        lines = content.splitlines()
+        truncated = len(lines) > 200
+        if truncated:
+            content = "\n".join(lines[:200])
         return {
             "status": "success",
             "file_path": file_path,
             "content": content,
             "size": len(content),
+            "truncated": truncated,
+            "total_lines": len(lines),
         }
     except Exception as e:
         logger.error("read_file failed for %s: %s", file_path, e)

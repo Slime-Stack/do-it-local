@@ -36,7 +36,12 @@ def get_thinking_config(role: str):
     from google.genai import types
 
     if MODEL_TIER == "stable":
-        levels = {"scanner": "medium", "detector": "high", "generator": "high"}
+        levels = {
+            "scanner": "low",
+            "detector": "medium",
+            "recommender": "medium",
+            "generator": "medium",
+        }
         return types.ThinkingConfig(thinking_level=levels.get(role, "medium"))
 
     budgets = {"scanner": 2048, "detector": 4096, "generator": 4096}
