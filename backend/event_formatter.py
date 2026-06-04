@@ -25,6 +25,14 @@ def format_event(event) -> dict | None:
             status = state_delta[PIPELINE_STATUS_KEY]
             return {"type": "status", "status": status}
 
+        # Also check escalation — when a new sub-agent starts
+        if state_delta:
+            import logging
+
+            logging.getLogger(__name__).debug(
+                "state_delta keys: %s", list(state_delta.keys())
+            )
+
     author = getattr(event, "author", None) or ""
     agent = author if isinstance(author, str) else str(author)
 

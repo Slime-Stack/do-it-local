@@ -24,7 +24,7 @@ from backend.event_formatter import format_done, format_event
 
 logger = logging.getLogger(__name__)
 
-_semaphore = asyncio.Semaphore(1)
+_lock = asyncio.Lock()
 
 
 def _fetch_repo_tree(project_url: str, gitlab_token: str) -> str:
@@ -54,7 +54,11 @@ async def stream_pipeline(
     environment_target: str = "local",
 ) -> AsyncGenerator[str, None]:
     """Run the pipeline and yield SSE-formatted event strings."""
-    async with _semaphore:
+    if _lock.locked():
+        yield f"data: {json.dumps({'type': 'error', 'error': 'A pipeline is already running. Please wait.'})}\n\n"
+        return
+
+    async with _lock:
         # Pre-fetch repo tree so Scanner doesn't need a round-trip
         try:
             repo_tree = await asyncio.to_thread(

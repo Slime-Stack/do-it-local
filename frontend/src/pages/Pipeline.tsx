@@ -32,9 +32,15 @@ export default function Pipeline({ projectUrl, gitlabPat, mcpToken, targetBranch
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [error, setError] = useState('')
   const feedRef = useRef<HTMLDivElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
+    // Abort any previous stream (handles StrictMode remount)
+    if (abortRef.current) {
+      abortRef.current.abort()
+    }
     const controller = new AbortController()
+    abortRef.current = controller
 
     const handleEvent = (event: PipelineEvent) => {
       if (event.type === 'status') {
